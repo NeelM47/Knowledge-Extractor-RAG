@@ -3,10 +3,13 @@
 from django.shortcuts import render, redirect
 from django.core.files.storage import FileSystemStorage
 from neo4j import GraphDatabase
+from dotenv import load_dotenv
 import os
 
 # Import our master functions from the refactored pipeline
 from rag_pipeline import process_and_ingest_pdf, ask_question_to_rag, get_list_of_ingested_docs
+
+load_dotenv()
 
 # --- Neo4j Connection ---
 NEO4J_URI=os.getenv("NEO4J_URI")
