@@ -8,10 +8,36 @@ ic.configureOutput(prefix=f'Debug | ', includeContext=True)
 import os
 import json
 
-LLM_MODEL_NAME = "gemini-2.5-pro"
+LLM_MODEL_NAME = None
 gemini_api_key = os.getenv("GEMINI_API_KEY")
 configure(api_key=gemini_api_key)
-EMBEDDING_MODEL = SentenceTransformer('all-MiniLM-L6-v2')
+EMBEDDING_MODEL = None
+
+def get_embedding_model():
+    """Loads the embedding model if it hasn't been loaded yet."""
+    global EMBEDDING_MODEL
+    if EMBEDDING_MODEL is None:
+        print("Lazy loading embedding model for the first time...")
+        EMBEDDING_MODEL = SentenceTransformer('all-MiniLM-L6-v2')
+    return EMBEDDING_MODEL
+
+def get_llm_model():
+    """Loads the LLM if it hasn't been loaded yet."""
+    global LLM_MODEL
+    if LLM_MODEL is None:
+        print("Lazy loading Generative Model for the first time...")
+        # Ensure your API key is set as an environment variable in your Space
+        configure(api_key=os.getenv("GEMINI_API_KEY"))
+        LLM_MODEL = GenerativeModel("gemini-1.5-pro-latest")
+    return LLM_MODEL
+
+def get_docling_converter():
+    """Loads the Docling converter if it hasn't been loaded yet."""
+    global DOCLING_CONVERTER
+    if DOCLING_CONVERTER is None:
+        print("Lazy loading Docling converter for the first time...")
+        DOCLING_CONVERTER = DocumentConverter()
+    return DOCLING_CONVERTER
 
 def generate_answer_with_context(question: str, context_chunks: List[Dict]) -> str:
     """
@@ -25,7 +51,7 @@ def generate_answer_with_context(question: str, context_chunks: List[Dict]) -> s
         The generated answer
     """
     # Initialize the Gemini model
-    model = GenerativeModel(LLM_MODEL_NAME)
+    model = get_llm_model()
 
     # Prepare the context by combining all relevant chunks
     context = "\n\n".join([f"Source (Page {chunk['page']}, Chunk {chunk['chunkno']}):\n{chunk['text']}"
@@ -91,6 +117,7 @@ def process_pdf_with_docling(pdf_path):
     Returns:
         A dictionary representing the structured document content, or None if an error occurs.
     """
+
     # Check if the file exists
     if not os.path.exists(pdf_path):
         print(f"Error: The file '{pdf_path}' was not found.")
@@ -101,7 +128,7 @@ def process_pdf_with_docling(pdf_path):
     try:
         # 1. Initialize the DocumentConverter
         # The first time this runs, it will download the necessary models.
-        converter = DocumentConverter()
+        converter = get_docling_converter()
         
         # 2. Convert the document
         # Docling can take a file path directly.
@@ -177,7 +204,7 @@ def generate_embeddings(chunks):
     """
     # Load a pre-trained sentence transformer model.
     # The first time you run this, it will download the model.
-    model = SentenceTransformer('all-MiniLM-L6-v2')
+    model = get_embedding_model()
 
     # It's more efficient to embed all texts at once
     texts_to_embed = [chunk['text'] for chunk in chunks]
@@ -275,6 +302,8 @@ def ask_question_to_rag(driver, question, filename, top_k=3):
     print(f"--- Querying {filename} with question: '{question}' ---")
 
     # This calls the query function you already wrote
+    EMBEDDING_MODEL = get_embedding_model()
+
     relevant_chunks = query_neo4j_for_chunks(driver, EMBEDDING_MODEL, question, top_k)
 
     if not relevant_chunks:
