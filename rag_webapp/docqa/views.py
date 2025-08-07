@@ -11,7 +11,7 @@ from rag_pipeline import process_and_ingest_pdf, ask_question_to_rag, get_list_o
 # --- Neo4j Connection ---
 NEO4J_URI = os.getenv("NEO4J_URI")
 NEO4J_USER = "neo4j"
-NEO4J_PASSWORD = "rkH-xq6G3jK7hFdk2MQjFT9qqJod_k9wY-riOni-9mM" # Use environment variables in a real app!
+NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
 def main_interface(request):
