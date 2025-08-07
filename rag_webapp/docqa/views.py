@@ -12,6 +12,7 @@ from rag_pipeline import process_and_ingest_pdf, ask_question_to_rag, get_list_o
 NEO4J_URI = os.getenv("NEO4J_URI")
 NEO4J_USER = "neo4j"
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 print(f"DEBUG: NEO4J_URI        = '{NEO4J_URI}' (Type: {type(NEO4J_URI)})")
 print(f"DEBUG: NEO4J_PASSWORD   = '...first 3 chars...{str(NEO4J_PASSWORD)[:3]}' (Type: {type(NEO4J_PASSWORD)})")
