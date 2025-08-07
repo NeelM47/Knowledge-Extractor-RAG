@@ -1,3 +1,13 @@
+---
+title: Intelligent Document QA
+emoji: 📄
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 8000
+pinned: false
+---
+
 # Intelligent Document QA with RAG and Citations
 
 This project implements a complete, end-to-end Retrieval-Augmented Generation (RAG) pipeline that allows users to upload their own PDF documents and ask questions based on the content. The system provides accurate answers along with citations, pointing to the specific page number from which the information was retrieved.
