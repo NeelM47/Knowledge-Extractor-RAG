@@ -37,7 +37,7 @@ graph TD
     B --> C[📄 Docling: Parse PDF];
     C --> D[✂️ Chunking Logic];
     D --> E[🧠 Sentence Transformers: Generate Embeddings];
-    E --> F((🐘 Neo4j)): Store Chunks & Embeddings;
+    E --> F((🐘 Neo4j: Chunks & Embeddings));
 ```
 
 ### Query Pipeline
@@ -80,8 +80,8 @@ Follow these instructions to set up and run the project locally.
 
 ### 1. Clone the Repository
 ```bash
-git clone 
-cd 
+git clone https://github.com/NeelM47/Knowledge-Extractor-RAG
+cd Knowledge-Extractor-RAG
 ```
 
 ### 2. Set Up the Environment
