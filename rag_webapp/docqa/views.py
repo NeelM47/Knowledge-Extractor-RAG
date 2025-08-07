@@ -6,19 +6,16 @@ from neo4j import GraphDatabase
 from dotenv import load_dotenv
 import os
 
+load_dotenv()
+
 # Import our master functions from the refactored pipeline
 from rag_pipeline import process_and_ingest_pdf, ask_question_to_rag, get_list_of_ingested_docs
-
-load_dotenv()
 
 # --- Neo4j Connection ---
 NEO4J_URI=os.getenv("NEO4J_URI")
 NEO4J_USER="neo4j"
 NEO4J_PASSWORD=os.getenv("NEO4J_PASSWORD")
 GEMINI_API_KEY=os.getenv("GEMINI_API_KEY")
-SAMPLE=os.getenv("SAMPLE")
-
-print(f"DEBUG: SAMPLE        = '{SAMPLE}' (Type: {type(SAMPLE)})")
 
 print(f"DEBUG: NEO4J_URI        = '{NEO4J_URI}' (Type: {type(NEO4J_URI)})")
 print(f"DEBUG: NEO4J_PASSWORD   = '...first 3 chars...{str(NEO4J_PASSWORD)[:3]}' (Type: {type(NEO4J_PASSWORD)})")
