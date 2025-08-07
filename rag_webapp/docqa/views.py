@@ -12,6 +12,20 @@ from rag_pipeline import process_and_ingest_pdf, ask_question_to_rag, get_list_o
 NEO4J_URI = os.getenv("NEO4J_URI")
 NEO4J_USER = "neo4j"
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
+
+print(f"DEBUG: NEO4J_URI        = '{NEO4J_URI}' (Type: {type(NEO4J_URI)})")
+print(f"DEBUG: NEO4J_PASSWORD   = '...first 3 chars...{str(NEO4J_PASSWORD)[:3]}' (Type: {type(NEO4J_PASSWORD)})")
+print(f"DEBUG: GEMINI_API_KEY   = '...first 3 chars...{str(GEMINI_API_KEY)[:3]}' (Type: {type(GEMINI_API_KEY)})")
+print("--- END OF DEBUGGING BLOCK ---")
+print("="*50)
+
+# This check will now tell us exactly which variable is missing
+if not NEO4J_URI or not NEO4J_PASSWORD or not GEMINI_API_KEY:
+    raise ValueError(
+        "CRITICAL ERROR: One or more required environment variables are not set. "
+        "Please check your repository secrets in the Hugging Face Space settings."
+    )
+
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
 def main_interface(request):
