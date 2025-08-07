@@ -1,0 +1,8 @@
+django
+gunicorn
+neo4j
+sentence-transformers
+google-generativeai
+docling
+python-dotenv
+icecream

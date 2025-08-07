@@ -1,0 +1,65 @@
+# docqa/views.py
+
+from django.shortcuts import render, redirect
+from django.core.files.storage import FileSystemStorage
+from neo4j import GraphDatabase
+import os
+
+# Import our master functions from the refactored pipeline
+from rag_pipeline import process_and_ingest_pdf, ask_question_to_rag, get_list_of_ingested_docs
+
+# --- Neo4j Connection ---
+NEO4J_URI = os.getenv("NEO4J_URI")
+NEO4J_USER = "neo4j"
+NEO4J_PASSWORD = "rkH-xq6G3jK7hFdk2MQjFT9qqJod_k9wY-riOni-9mM" # Use environment variables in a real app!
+driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+
+def main_interface(request):
+    """
+    This single view handles all user interactions:
+    - Displaying the main page.
+    - Processing PDF uploads.
+    - Handling user questions.
+    """
+    # Default context variables
+    context = {
+        'answer': "",
+        'last_question': "",
+        'last_doc': "",
+        'ingested_docs': get_list_of_ingested_docs(driver) # Get list for dropdown
+    }
+
+    if request.method == 'POST':
+        # --- Logic for handling PDF upload form ---
+        if 'upload_button' in request.POST and request.FILES.get('pdf_file'):
+            pdf_file = request.FILES['pdf_file']
+            fs = FileSystemStorage()
+            filename = fs.save(pdf_file.name, pdf_file)
+            uploaded_file_path = fs.path(filename)
+
+            try:
+                # Call our main ingestion function
+                process_and_ingest_pdf(driver, uploaded_file_path)
+            except Exception as e:
+                print(f"An error occurred during ingestion: {e}")
+            finally:
+                # Clean up the temporarily saved file
+                os.remove(uploaded_file_path)
+            
+            # Redirect to the same page to show the updated doc list
+            return redirect('main_interface')
+
+        # --- Logic for handling question form ---
+        if 'query_button' in request.POST:
+            question = request.POST.get('question', '')
+            document = request.POST.get('document', '')
+            
+            if question and document:
+                # Call our main query function
+                answer = ask_question_to_rag(driver, question, document)
+                # Update context to display the results
+                context['answer'] = answer
+                context['last_question'] = question
+                context['last_doc'] = document
+
+    return render(request, 'docqa/interface.html', context)
