@@ -30,7 +30,26 @@ if not NEO4J_URI or not NEO4J_PASSWORD or not GEMINI_API_KEY:
         "Please check your repository secrets in the Hugging Face Space settings."
     )
 
-driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+_driver = None
+
+def get_neo4j_driver():
+    """
+    This function creates a Neo4j driver instance if one doesn't exist,
+    or returns the existing one. This is called a singleton pattern.
+    """
+    global _driver
+    if _driver is None:
+        print("--- Initializing Neo4j driver for the first time ---")
+        try:
+            _driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+            _driver.verify_connectivity()
+            print("--- Neo4j connection successful ---")
+        except Exception as e:
+            print(f"--- FAILED to connect to Neo4j: {e} ---")
+            raise e
+    return _driver
+
+#driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
 def main_interface(request):
     """
@@ -39,44 +58,56 @@ def main_interface(request):
     - Processing PDF uploads.
     - Handling user questions.
     """
-    # Default context variables
-    context = {
-        'answer': "", 'last_question': "",
-        'last_doc': "",
-        'ingested_docs': get_list_of_ingested_docs(driver) # Get list for dropdown
-    }
+    try:
+        
+        driver = get_neo4j_driver()
 
-    if request.method == 'POST':
-        # --- Logic for handling PDF upload form ---
-        if 'upload_button' in request.POST and request.FILES.get('pdf_file'):
-            pdf_file = request.FILES['pdf_file']
-            fs = FileSystemStorage()
-            filename = fs.save(pdf_file.name, pdf_file)
-            uploaded_file_path = fs.path(filename)
+        # Default context variables
+        context = {
+            'answer': "", 'last_question': "",
+            'last_doc': "",
+            'ingested_docs': get_list_of_ingested_docs(driver) # Get list for dropdown
+        }
 
-            try:
-                # Call our main ingestion function
-                process_and_ingest_pdf(driver, uploaded_file_path)
-            except Exception as e:
-                print(f"An error occurred during ingestion: {e}")
-            finally:
-                # Clean up the temporarily saved file
-                os.remove(uploaded_file_path)
-            
-            # Redirect to the same page to show the updated doc list
-            return redirect('main_interface')
+        if request.method == 'POST':
+            # --- Logic for handling PDF upload form ---
+            if 'upload_button' in request.POST and request.FILES.get('pdf_file'):
+                pdf_file = request.FILES['pdf_file']
+                fs = FileSystemStorage()
+                filename = fs.save(pdf_file.name, pdf_file)
+                uploaded_file_path = fs.path(filename)
 
-        # --- Logic for handling question form ---
-        if 'query_button' in request.POST:
-            question = request.POST.get('question', '')
-            document = request.POST.get('document', '')
-            
-            if question and document:
-                # Call our main query function
-                answer = ask_question_to_rag(driver, question, document)
-                # Update context to display the results
-                context['answer'] = answer
-                context['last_question'] = question
-                context['last_doc'] = document
+                try:
+                    # Call our main ingestion function
+                    process_and_ingest_pdf(driver, uploaded_file_path)
+                except Exception as e:
+                    print(f"An error occurred during ingestion: {e}")
+                finally:
+                    # Clean up the temporarily saved file
+                    os.remove(uploaded_file_path)
+                
+                # Redirect to the same page to show the updated doc list
+                return redirect('main_interface')
 
-    return render(request, 'docqa/interface.html', context)
+            # --- Logic for handling question form ---
+            if 'query_button' in request.POST:
+                question = request.POST.get('question', '')
+                document = request.POST.get('document', '')
+                
+                if question and document:
+                    # Call our main query function
+                    answer = ask_question_to_rag(driver, question, document)
+                    # Update context to display the results
+                    context['answer'] = answer
+                    context['last_question'] = question
+                    context['last_doc'] = document
+
+        return render(request, 'docqa/interface.html', context)
+
+     except Exception as e:
+        # If we can't connect to the database, show an error page.
+        print(f"A fatal error occurred in the main view: {e}")
+        # You could render a specific error.html template here
+        return render(request, 'docqa/error.html', {'error_message': str(e)})
+
+
