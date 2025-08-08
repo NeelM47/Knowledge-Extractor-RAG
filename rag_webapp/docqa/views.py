@@ -104,10 +104,8 @@ def main_interface(request):
 
         return render(request, 'docqa/interface.html', context)
 
-     except Exception as e:
-        # If we can't connect to the database, show an error page.
+    except Exception as e:
         print(f"A fatal error occurred in the main view: {e}")
-        # You could render a specific error.html template here
         return render(request, 'docqa/error.html', {'error_message': str(e)})
 
 
