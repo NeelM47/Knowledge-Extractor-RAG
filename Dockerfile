@@ -2,8 +2,8 @@
 FROM python:3.10-slim
 
 # Set environment variables for non-interactive installs
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 # Set the working directory in the container
 WORKDIR /app
@@ -13,7 +13,7 @@ COPY requirements.txt .
 
 # Install any needed packages specified in requirements.txt
 # We also install gunicorn, a professional web server for Django
-RUN pip install --no-cache-dir -r requirements.txt gunicorn
+RUN pip install --default-timeout=1000 --no-cache-dir -r requirements.txt gunicorn
 
 # Copy the Django project into the container
 COPY ./rag_webapp/ .
