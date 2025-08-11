@@ -24,4 +24,4 @@ EXPOSE 8000
 # The command to run your application
 # This uses Gunicorn, a production-ready server, instead of the dev server.
 # It points to your project's wsgi file.
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "rag_webapp.wsgi:application"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "1", "rag_webapp.wsgi:application"]
