@@ -8,10 +8,11 @@ ic.configureOutput(prefix=f'Debug | ', includeContext=True)
 import os
 import json
 
-LLM_MODEL_NAME = None
+LLM_MODEL = None
 gemini_api_key = os.getenv("GEMINI_API_KEY")
 configure(api_key=gemini_api_key)
 EMBEDDING_MODEL = None
+DOCLING_CONVERTER = DocumentConverter()
 
 def get_embedding_model():
     """Loads the embedding model if it hasn't been loaded yet."""
@@ -28,7 +29,7 @@ def get_llm_model():
         print("Lazy loading Generative Model for the first time...")
         # Ensure your API key is set as an environment variable in your Space
         configure(api_key=os.getenv("GEMINI_API_KEY"))
-        LLM_MODEL = GenerativeModel("gemini-1.5-pro-latest")
+        LLM_MODEL = GenerativeModel("gemini-2.5-pro")
     return LLM_MODEL
 
 def get_docling_converter():
@@ -69,8 +70,12 @@ def generate_answer_with_context(question: str, context_chunks: List[Dict]) -> s
 
     Answer:"""
 
+    print(prompt)
+
     # Generate the response
     response = model.generate_content(prompt)
+    
+    print(response)
 
     return response.text
 
@@ -92,6 +97,7 @@ def query_llm(driver, question: str, filename: str, top_k: int = 4) -> str:
     # 1. Load the embedding model
     embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
 
+    top_k = 1
     # 2. Retrieve relevant chunks
     relevant_chunks = query_neo4j_for_chunks(driver, embedding_model, user_query, top_k)
 

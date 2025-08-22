@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'docqa',
+    'django_q',
 ]
 
 MIDDLEWARE = [
@@ -127,3 +128,13 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+Q_CLUSTER = {
+    'name': 'DjangORM',
+    'workers': 1,  # Start with one worker, perfect for local dev
+    'timeout': 600, # Give tasks up to 10 minutes to complete (for large PDFs)
+    'retry': 720,   # Retry failed tasks after 12 minutes
+    'queue_limit': 50,
+    'bulk': 10,
+    'orm': 'default' # Use the default Django database to store tasks
+}

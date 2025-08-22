@@ -1,9 +1,10 @@
-django
+django==4.2.0
 gunicorn
 neo4j
 sentence-transformers
 google-generativeai
 docling
+django-q
 python-dotenv
 icecream
 --extra-index-url https://download.pytorch.org/whl/cpu

@@ -4,6 +4,8 @@ from django.shortcuts import render, redirect
 from django.core.files.storage import FileSystemStorage
 from neo4j import GraphDatabase
 from dotenv import load_dotenv
+from django.contrib import messages
+from django_q.tasks import async_task
 import os
 
 load_dotenv()
@@ -77,14 +79,22 @@ def main_interface(request):
                 filename = fs.save(pdf_file.name, pdf_file)
                 uploaded_file_path = fs.path(filename)
 
-                try:
-                    # Call our main ingestion function
-                    process_and_ingest_pdf(driver, uploaded_file_path)
-                except Exception as e:
-                    print(f"An error occurred during ingestion: {e}")
-                finally:
-                    # Clean up the temporarily saved file
-                    os.remove(uploaded_file_path)
+                async_task(
+                        'docqa.tasks.ingestion_task',
+                        uploaded_file_path
+                        )
+
+                messages.success(request, f"'{pdf_file.name}' has been submitted for processing. It will be available shortly.")
+
+                #try:
+                #    # Call our main ingestion function
+                #    process_and_ingest_pdf(driver, uploaded_file_path)
+                #except Exception as e:
+                #    print(f"An error occurred during ingestion: {e}")
+                #finally:
+                #    # Clean up the temporarily saved file
+                #    os.remove(uploaded_file_path)
+
                 
                 # Redirect to the same page to show the updated doc list
                 return redirect('main_interface')
