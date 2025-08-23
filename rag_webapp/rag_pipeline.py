@@ -2,6 +2,7 @@ from docling.document_converter import DocumentConverter
 from sentence_transformers import SentenceTransformer
 from google.generativeai import configure, GenerativeModel
 from typing import List, Dict
+from sentence_transformers.cross_encoder import CrossEncoder
 from neo4j import GraphDatabase
 from icecream import ic
 ic.configureOutput(prefix=f'Debug | ', includeContext=True)
@@ -168,7 +169,7 @@ def load_docling_json(json_path):
     with open(json_path, 'r', encoding='utf-8') as f:
         return json.load(f)
 
-def create_fixed_size_chunks(data, chunk_size=1000, chunk_overlap=150):
+def create_fixed_size_chunks(data, filename, chunk_size=1000, chunk_overlap=150):
 
     page_chunks = {}
     for text_block in data.get('texts', []):
@@ -192,7 +193,8 @@ def create_fixed_size_chunks(data, chunk_size=1000, chunk_overlap=150):
             final_chunks.append({
                 "page_number": page_num,
                 "text": chunk,
-                "chunk_on_page": len(final_chunks) + 1
+                "chunk_on_page": len(final_chunks) + 1,
+                "source": filename
             })
             start_index += chunk_size - chunk_overlap
 
@@ -257,6 +259,10 @@ def ingest_chunks_into_neo4j(driver, filename, chunks_with_embeddings):
     
     // This part also remains the same: connect the document to its chunk
     CREATE (d)-[:HAS_CHUNK]->(c)
+    WITH c, chunk_data
+    UNWIND chunk_data.entities AS entity_name
+    MERGE (e:Entity {name: entity_name})
+    CREATE (c)-[:MENTIONS]->(e)
     """
     
     # The session execution block remains the same
@@ -287,7 +293,7 @@ def process_and_ingest_pdf(driver, pdf_filepath):
     if not docling_output:
         raise ValueError("Docling failed to process the PDF.")
 
-    chunks = create_fixed_size_chunks(docling_output)
+    chunks = create_fixed_size_chunks(docling_output, filename)
 
     # Add source filename to each chunk. This is crucial.
     for chunk in chunks:
@@ -303,6 +309,21 @@ def process_and_ingest_pdf(driver, pdf_filepath):
 
     print(f"--- Successfully Ingested: {filename} ---")
 
+def rerank_chunks(question, chunks):
+    """Re-ranks a list of chunks using a more powerful CrossEncoder model."""
+    model = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2', max_length=512)
+
+    # The model expects a list of [question, chunk_text] pairs
+    pairs = [[question, chunk['text']] for chunk in chunks]
+
+    scores = model.predict(pairs)
+
+    # Combine chunks with their new scores and sort
+    for i, chunk in enumerate(chunks):
+        chunk['rerank_score'] = scores[i]
+
+    return sorted(chunks, key=lambda x: x['rerank_score'], reverse=True)
+
 def ask_question_to_rag(driver, question, filename, top_k=3):
     """A single function that runs the entire querying pipeline."""
     print(f"--- Querying {filename} with question: '{question}' ---")
@@ -310,14 +331,43 @@ def ask_question_to_rag(driver, question, filename, top_k=3):
     # This calls the query function you already wrote
     EMBEDDING_MODEL = get_embedding_model()
 
-    relevant_chunks = query_neo4j_for_chunks(driver, EMBEDDING_MODEL, question, top_k)
+    #relevant_chunks = query_neo4j_for_chunks(driver, EMBEDDING_MODEL, question, top_k)
+    relevant_chunks = hybrid_retrieval(driver, EMBEDDING_MODEL, question, filename)
+    print(relevant_chunks)
 
     if not relevant_chunks:
         return "I could not find any relevant information in the document to answer your question."
 
+    reranked_chunks = rerank_chunks(question, relevant_chunks)
+
     # This calls the LLM function you already wrote
     answer = generate_answer_with_context(question, relevant_chunks)
     return answer
+
+def extract_entities_from_text(text: str) -> list:
+    """Uses the LLM to extract key entities from a text chunk."""
+    model = get_llm_model() # Your lazy-loader for Gemini
+
+    prompt = (
+        "You are a helpful AI assistant for knowledge graph construction.\n"
+        "From the following text, extract the key entities (people, organizations, locations, technical concepts, projects).\n"
+        "Return the result as a JSON list of strings. Example: [\"NASA\", \"Aerojet Rocketdyne\", \"bipropellant valve\"]\n\n"
+        f"--- TEXT ---\n{text}\n\n"
+        "--- ENTITIES (JSON List) ---\n"
+    )
+
+    ic(prompt)
+
+    try:
+        response = model.generate_content(prompt)
+        ic(response.text)
+        # Clean up the response to get a valid JSON list
+        json_text = response.text.strip().replace("```json", "").replace("```", "")
+        entities = json.loads(json_text)
+        return entities
+    except (ValueError, json.JSONDecodeError) as e:
+        print(f"Could not parse entities from LLM response: {e}")
+        return []
 
 def get_list_of_ingested_docs(driver):
     """Queries Neo4j to get a list of all processed document filenames."""
@@ -325,3 +375,42 @@ def get_list_of_ingested_docs(driver):
     with driver.session(database="neo4j") as session:
         results = session.run(query)
         return [record["filename"] for record in results]
+
+def hybrid_retrieval(driver, model, question, filename, top_k=5):
+    """Performs a hybrid search using both vectors and graph entities."""
+    
+    # 1. Extract entities from the user's question
+    question_entities = extract_entities_from_text(question)
+    
+    # 2. Embed the user's question
+    query_embedding = model.encode(question).tolist()
+
+    hybrid_query = """
+    // Part 1: Vector Search
+    CALL db.index.vector.queryNodes('chunk_embeddings', $top_k, $embedding) YIELD node AS vector_node, score
+    WHERE vector_node.source = $filename
+    
+    // Part 2: Graph Search (find chunks that mention entities from the question)
+    // Use OPTIONAL MATCH so we still get results if no entities are found
+    WITH vector_node, score
+    OPTIONAL MATCH (entity:Entity)<-[:MENTIONS]-(graph_node:Chunk)
+    WHERE entity.name IN $question_entities AND graph_node.source = $filename
+
+    // Collect all unique nodes from both searches
+    WITH collect(DISTINCT vector_node) + collect(DISTINCT graph_node) AS all_nodes
+    UNWIND all_nodes AS node
+    
+    // Return distinct nodes with their text and page number
+    RETURN DISTINCT node.text AS text, node.page_number AS page, node.chunk_on_page AS chunkno
+    LIMIT 10 // Return a larger set of candidates for re-ranking
+    """
+    
+    with driver.session(database="neo4j") as session:
+        results = session.run(
+            hybrid_query, 
+            top_k=top_k, 
+            embedding=query_embedding, 
+            filename=filename, 
+            question_entities=question_entities
+        )
+        return [{"text": record["text"], "page": record["page"], "chunkno": record["chunkno"]} for record in results]

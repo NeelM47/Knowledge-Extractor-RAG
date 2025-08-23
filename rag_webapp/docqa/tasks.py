@@ -3,16 +3,19 @@
 # Import everything this function needs
 import os
 from neo4j import GraphDatabase
+
 # You'll need to import your actual pipeline functions from rag_pipeline
 from rag_pipeline import (
     process_pdf_with_docling, 
     create_fixed_size_chunks,
     generate_embeddings,
     create_vector_index,
+    extract_entities_from_text,
     ingest_chunks_into_neo4j
 )
 
 # This is our background task. It's just a regular Python function.
+
 def ingestion_task(pdf_filepath):
     """
     A single function that runs the entire ingestion pipeline for a given PDF.
@@ -30,9 +33,10 @@ def ingestion_task(pdf_filepath):
     
     try:
         docling_output = process_pdf_with_docling(pdf_filepath)
-        chunks = create_fixed_size_chunks(docling_output)
+        chunks = create_fixed_size_chunks(docling_output, filename)
         
         for chunk in chunks:
+            chunk['entities'] = extract_entities_from_text(chunk['text'])
             if 'metadata' not in chunk: chunk['metadata'] = {}
             chunk['metadata']['source'] = filename
 
