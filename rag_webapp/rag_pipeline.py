@@ -19,7 +19,7 @@ def get_embedding_model():
     """Loads the embedding model if it hasn't been loaded yet."""
     global EMBEDDING_MODEL
     if EMBEDDING_MODEL is None:
-        print("Lazy loading embedding model for the first time...")
+        #print("Lazy loading embedding model for the first time...")
         EMBEDDING_MODEL = SentenceTransformer('all-MiniLM-L6-v2')
     return EMBEDDING_MODEL
 
@@ -27,7 +27,7 @@ def get_llm_model():
     """Loads the LLM if it hasn't been loaded yet."""
     global LLM_MODEL
     if LLM_MODEL is None:
-        print("Lazy loading Generative Model for the first time...")
+        #print("Lazy loading Generative Model for the first time...")
         # Ensure your API key is set as an environment variable in your Space
         configure(api_key=os.getenv("GEMINI_API_KEY"))
         LLM_MODEL = GenerativeModel("gemini-2.5-pro")
@@ -37,7 +37,7 @@ def get_docling_converter():
     """Loads the Docling converter if it hasn't been loaded yet."""
     global DOCLING_CONVERTER
     if DOCLING_CONVERTER is None:
-        print("Lazy loading Docling converter for the first time...")
+        #print("Lazy loading Docling converter for the first time...")
         DOCLING_CONVERTER = DocumentConverter()
     return DOCLING_CONVERTER
 
@@ -71,12 +71,12 @@ def generate_answer_with_context(question: str, context_chunks: List[Dict]) -> s
 
     Answer:"""
 
-    print(prompt)
+    #print(prompt)
 
     # Generate the response
     response = model.generate_content(prompt)
     
-    print(response)
+    #print(response)
 
     return response.text
 
@@ -98,7 +98,6 @@ def query_llm(driver, question: str, filename: str, top_k: int = 4) -> str:
     # 1. Load the embedding model
     embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
 
-    top_k = 1
     # 2. Retrieve relevant chunks
     relevant_chunks = query_neo4j_for_chunks(driver, embedding_model, user_query, top_k)
 
@@ -130,7 +129,7 @@ def process_pdf_with_docling(pdf_path):
         print(f"Error: The file '{pdf_path}' was not found.")
         return None
 
-    print("Initializing DocumentConverter. This may take a moment on the first run...")
+    #print("Initializing DocumentConverter. This may take a moment on the first run...")
     
     try:
         # 1. Initialize the DocumentConverter
@@ -139,9 +138,9 @@ def process_pdf_with_docling(pdf_path):
         
         # 2. Convert the document
         # Docling can take a file path directly.
-        print(f"Processing '{pdf_path}' with Docling...")
+        #print(f"Processing '{pdf_path}' with Docling...")
         result = converter.convert(pdf_path)
-        print("Conversion complete.")
+        #print("Conversion complete.")
         
         # 3. Export to a structured format (e.g., a Python dictionary or Markdown)
         # We'll use to_dict() to see the rich structure.
@@ -153,21 +152,6 @@ def process_pdf_with_docling(pdf_path):
     except Exception as e:
         print(f"An error occurred while processing the PDF with Docling: {e}")
         return None
-
-def save_output(doc_dict, filename):
-    output_json_path = filename 
-    print(f"Saving extracted text to '{output_json_path}'...")
-    with open(output_json_path, 'w', encoding='utf-8') as f:
-        json.dump(doc_dict, f, ensure_ascii=False, indent=4)
-
-def load_docling_json(json_path):
-    """Loads the structured JSON output from Docling."""
-    if not os.path.exists(json_path):
-        print(f"Error: JSON file not found at '{json_path}'")
-        return None
-    
-    with open(json_path, 'r', encoding='utf-8') as f:
-        return json.load(f)
 
 def create_fixed_size_chunks(data, filename, chunk_size=1000, chunk_overlap=150):
 
@@ -217,7 +201,7 @@ def generate_embeddings(chunks):
     # It's more efficient to embed all texts at once
     texts_to_embed = [chunk['text'] for chunk in chunks]
 
-    print("Generating embeddings... This may take a moment.")
+    #print("Generating embeddings... This may take a moment.")
     # Generate embeddings
     embeddings = model.encode(texts_to_embed, show_progress_bar=True)
 
@@ -238,7 +222,7 @@ def create_vector_index(driver):
     """
     with driver.session() as session:
         session.run(index_query)
-        print("Vector index created or already exists.")
+        #print("Vector index created or already exists.")
 
 def ingest_chunks_into_neo4j(driver, filename, chunks_with_embeddings):
     """
@@ -268,7 +252,7 @@ def ingest_chunks_into_neo4j(driver, filename, chunks_with_embeddings):
     # The session execution block remains the same
     with driver.session(database="neo4j") as session: # It's good practice to specify the database
         session.run(ingest_query, filename=filename, chunks=chunks_with_embeddings)
-        print(f"Ingested {len(chunks_with_embeddings)} chunks for document '{filename}'.")
+        #print(f"Ingested {len(chunks_with_embeddings)} chunks for document '{filename}'.")
 
 def query_neo4j_for_chunks(driver, model, query_text, top_k=3):
     """Finds the most relevant chunks in Neo4j for a given query."""
@@ -286,7 +270,7 @@ def query_neo4j_for_chunks(driver, model, query_text, top_k=3):
 
 def process_and_ingest_pdf(driver, pdf_filepath):
     """A single function that runs the entire ingestion pipeline for a given PDF."""
-    print(f"--- Starting Ingestion Pipeline for: {pdf_filepath} ---")
+    #print(f"--- Starting Ingestion Pipeline for: {pdf_filepath} ---")
     filename = os.path.basename(pdf_filepath)
 
     docling_output = process_pdf_with_docling(pdf_filepath)
@@ -307,7 +291,7 @@ def process_and_ingest_pdf(driver, pdf_filepath):
     create_vector_index(driver) # Assuming you have this function
     ingest_chunks_into_neo4j(driver, filename, chunks_with_embeddings)
 
-    print(f"--- Successfully Ingested: {filename} ---")
+    #print(f"--- Successfully Ingested: {filename} ---")
 
 def rerank_chunks(question, chunks):
     """Re-ranks a list of chunks using a more powerful CrossEncoder model."""
@@ -326,19 +310,29 @@ def rerank_chunks(question, chunks):
 
 def ask_question_to_rag(driver, question, filename, top_k=3):
     """A single function that runs the entire querying pipeline."""
-    print(f"--- Querying {filename} with question: '{question}' ---")
+    #print(f"--- Querying {filename} with question: '{question}' ---")
 
     # This calls the query function you already wrote
     EMBEDDING_MODEL = get_embedding_model()
 
     #relevant_chunks = query_neo4j_for_chunks(driver, EMBEDDING_MODEL, question, top_k)
     relevant_chunks = hybrid_retrieval(driver, EMBEDDING_MODEL, question, filename)
-    print(relevant_chunks)
 
     if not relevant_chunks:
         return "I could not find any relevant information in the document to answer your question."
 
+    #ic("CANDIDATE chunks from initial retrieval (Top 10):")
+    #for i, chunk in enumerate(relevant_chunks):
+        #print(f" {i+1}. Page {chunk.get('page', 'N/A')}, '{chunk['text'][:80]}...'")
+
     reranked_chunks = rerank_chunks(question, relevant_chunks)
+
+    #ic("RE-RANKED chunks (sorted by new score):")
+    #for i, chunk in enumerate(reranked_chunks):
+        # We print the new rerank_score to see the new order
+        #print(f"  {i+1}. Page {chunk.get('page', 'N/A')}, Score: {chunk.get('rerank_score', 0):.4f}, '{chunk['text'][:80]}...'")
+    
+    relevant_chunks = reranked_chunks[:top_k]
 
     # This calls the LLM function you already wrote
     answer = generate_answer_with_context(question, relevant_chunks)
@@ -356,11 +350,11 @@ def extract_entities_from_text(text: str) -> list:
         "--- ENTITIES (JSON List) ---\n"
     )
 
-    ic(prompt)
+    #ic(prompt)
 
     try:
         response = model.generate_content(prompt)
-        ic(response.text)
+        #ic(response.text)
         # Clean up the response to get a valid JSON list
         json_text = response.text.strip().replace("```json", "").replace("```", "")
         entities = json.loads(json_text)
