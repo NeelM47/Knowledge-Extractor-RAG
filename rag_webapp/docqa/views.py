@@ -2,6 +2,7 @@
 
 from django.shortcuts import render, redirect
 from django.core.files.storage import FileSystemStorage
+from django.http import JsonResponse
 from neo4j import GraphDatabase
 from dotenv import load_dotenv
 from django.contrib import messages
@@ -10,27 +11,7 @@ import os
 
 load_dotenv()
 
-# Import our master functions from the refactored pipeline
-from rag_pipeline import process_and_ingest_pdf, ask_question_to_rag, get_list_of_ingested_docs
-
-# --- Neo4j Connection ---
-NEO4J_URI=os.getenv("NEO4J_URI")
-NEO4J_USER="neo4j"
-NEO4J_PASSWORD=os.getenv("NEO4J_PASSWORD")
-GEMINI_API_KEY=os.getenv("GEMINI_API_KEY")
-
-print(f"DEBUG: NEO4J_URI        = '{NEO4J_URI}' (Type: {type(NEO4J_URI)})")
-print(f"DEBUG: NEO4J_PASSWORD   = '...first 3 chars...{str(NEO4J_PASSWORD)[:3]}' (Type: {type(NEO4J_PASSWORD)})")
-print(f"DEBUG: GEMINI_API_KEY   = '...first 3 chars...{str(GEMINI_API_KEY)[:3]}' (Type: {type(GEMINI_API_KEY)})")
-print("--- END OF DEBUGGING BLOCK ---")
-print("="*50)
-
-# This check will now tell us exactly which variable is missing
-if not NEO4J_URI or not NEO4J_PASSWORD or not GEMINI_API_KEY:
-    raise ValueError(
-        "CRITICAL ERROR: One or more required environment variables are not set. "
-        "Please check your repository secrets in the Hugging Face Space settings."
-    )
+from rag_pipeline.core import ask_question_to_rag, get_list_of_ingested_docs
 
 _driver = None
 
@@ -43,6 +24,14 @@ def get_neo4j_driver():
     if _driver is None:
         print("--- Initializing Neo4j driver for the first time ---")
         try:
+            NEO4J_URI=os.getenv("NEO4J_URI")
+            NEO4J_USER="neo4j"
+            NEO4J_PASSWORD=os.getenv("NEO4J_PASSWORD")
+            GEMINI_API_KEY=os.getenv("GEMINI_API_KEY")
+
+            if not all([NEO4J_URI, NEO4J_PASSWORD]):
+                raise ValueError("NEO4J_URI or NEO4J_PASSWORD secrets are not set.")
+
             _driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
             _driver.verify_connectivity()
             print("--- Neo4j connection successful ---")
@@ -51,8 +40,6 @@ def get_neo4j_driver():
             raise e
     return _driver
 
-#driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
-
 def main_interface(request):
     """
     This single view handles all user interactions:
@@ -60,16 +47,18 @@ def main_interface(request):
     - Processing PDF uploads.
     - Handling user questions.
     """
+    context = {
+            'answer': "", 
+            'last_question': "",
+            'last_doc': "",
+            'ingested_docs':[], 
+        }
     try:
         
         driver = get_neo4j_driver()
 
         # Default context variables
-        context = {
-            'answer': "", 'last_question': "",
-            'last_doc': "",
-            'ingested_docs': get_list_of_ingested_docs(driver) # Get list for dropdown
-        }
+        context['ingested_docs'] = get_list_of_ingested_docs(driver)
 
         if request.method == 'POST':
             # --- Logic for handling PDF upload form ---
@@ -85,16 +74,6 @@ def main_interface(request):
                         )
 
                 messages.success(request, f"'{pdf_file.name}' has been submitted for processing. It will be available shortly.")
-
-                #try:
-                #    # Call our main ingestion function
-                #    process_and_ingest_pdf(driver, uploaded_file_path)
-                #except Exception as e:
-                #    print(f"An error occurred during ingestion: {e}")
-                #finally:
-                #    # Clean up the temporarily saved file
-                #    os.remove(uploaded_file_path)
-
                 
                 # Redirect to the same page to show the updated doc list
                 return redirect('main_interface')
@@ -112,10 +91,22 @@ def main_interface(request):
                     context['last_question'] = question
                     context['last_doc'] = document
 
-        return render(request, 'docqa/interface.html', context)
-
     except Exception as e:
         print(f"A fatal error occurred in the main view: {e}")
         return render(request, 'docqa/error.html', {'error_message': str(e)})
 
+    return render(request, 'docqa/interface.html', context)
+
+def get_documents_json(request):
+    """
+    An API endpoint that returns the list of ingested documents as JSON.
+    This is called by the JavaScript on the front-end to dynamically update the dropdown.
+    """
+    try:
+        driver = get_neo4j_driver()
+        doc_list = get_list_of_ingested_docs(driver)
+        return JsonResponse({'documents': doc_list})
+    except Exception as e:
+        # Return an error as JSON if the database connection fails
+        return JsonResponse({'error': str(e)}, status=500)
 

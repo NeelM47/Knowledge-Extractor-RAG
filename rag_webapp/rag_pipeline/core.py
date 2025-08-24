@@ -9,37 +9,13 @@ ic.configureOutput(prefix=f'Debug | ', includeContext=True)
 import os
 import json
 
-LLM_MODEL = None
-gemini_api_key = os.getenv("GEMINI_API_KEY")
-configure(api_key=gemini_api_key)
-EMBEDDING_MODEL = None
-DOCLING_CONVERTER = DocumentConverter()
-
-def get_embedding_model():
-    """Loads the embedding model if it hasn't been loaded yet."""
-    global EMBEDDING_MODEL
-    if EMBEDDING_MODEL is None:
-        #print("Lazy loading embedding model for the first time...")
-        EMBEDDING_MODEL = SentenceTransformer('all-MiniLM-L6-v2')
-    return EMBEDDING_MODEL
-
-def get_llm_model():
-    """Loads the LLM if it hasn't been loaded yet."""
-    global LLM_MODEL
-    if LLM_MODEL is None:
-        #print("Lazy loading Generative Model for the first time...")
-        # Ensure your API key is set as an environment variable in your Space
-        configure(api_key=os.getenv("GEMINI_API_KEY"))
-        LLM_MODEL = GenerativeModel("gemini-2.5-pro")
-    return LLM_MODEL
-
-def get_docling_converter():
-    """Loads the Docling converter if it hasn't been loaded yet."""
-    global DOCLING_CONVERTER
-    if DOCLING_CONVERTER is None:
-        #print("Lazy loading Docling converter for the first time...")
-        DOCLING_CONVERTER = DocumentConverter()
-    return DOCLING_CONVERTER
+from .utils import (
+        get_llm_model,
+        extract_entities_from_text,
+        get_docling_converter,
+        get_reranker_model,
+        get_embedding_model
+) 
 
 def generate_answer_with_context(question: str, context_chunks: List[Dict]) -> str:
     """
@@ -96,7 +72,8 @@ def query_llm(driver, question: str, filename: str, top_k: int = 4) -> str:
         The generated answer
     """
     # 1. Load the embedding model
-    embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+    #embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+    embedding_model = get_embedding_model()
 
     # 2. Retrieve relevant chunks
     relevant_chunks = query_neo4j_for_chunks(driver, embedding_model, user_query, top_k)
@@ -269,11 +246,13 @@ def query_neo4j_for_chunks(driver, model, query_text, top_k=3):
         return [{"text": record["text"], "page": record["page"], "chunkno": record["chunkno"], "score": record["score"]} for record in results]
 
 def process_and_ingest_pdf(driver, pdf_filepath):
+
     """A single function that runs the entire ingestion pipeline for a given PDF."""
     #print(f"--- Starting Ingestion Pipeline for: {pdf_filepath} ---")
     filename = os.path.basename(pdf_filepath)
 
     docling_output = process_pdf_with_docling(pdf_filepath)
+
     if not docling_output:
         raise ValueError("Docling failed to process the PDF.")
 
@@ -281,6 +260,9 @@ def process_and_ingest_pdf(driver, pdf_filepath):
 
     # Add source filename to each chunk. This is crucial.
     for chunk in chunks:
+
+        chunk['entities'] = extract_entities_from_text(chunk['text'])
+
         if 'metadata' not in chunk: # Make sure metadata key exists
             chunk['metadata'] = {}
         chunk['metadata']['source'] = filename
@@ -289,13 +271,16 @@ def process_and_ingest_pdf(driver, pdf_filepath):
 
     # Make sure vector index exists before ingesting
     create_vector_index(driver) # Assuming you have this function
+
     ingest_chunks_into_neo4j(driver, filename, chunks_with_embeddings)
 
     #print(f"--- Successfully Ingested: {filename} ---")
 
 def rerank_chunks(question, chunks):
     """Re-ranks a list of chunks using a more powerful CrossEncoder model."""
-    model = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2', max_length=512)
+    #model = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2', max_length=512)
+
+    model = get_reranker_model()
 
     # The model expects a list of [question, chunk_text] pairs
     pairs = [[question, chunk['text']] for chunk in chunks]
@@ -309,6 +294,7 @@ def rerank_chunks(question, chunks):
     return sorted(chunks, key=lambda x: x['rerank_score'], reverse=True)
 
 def ask_question_to_rag(driver, question, filename, top_k=3):
+
     """A single function that runs the entire querying pipeline."""
     #print(f"--- Querying {filename} with question: '{question}' ---")
 
