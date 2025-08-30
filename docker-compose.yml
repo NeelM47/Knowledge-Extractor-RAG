@@ -13,7 +13,7 @@ services:
     volumes:
       - neo4j_data:/data
     environment:
-      - NEO4J_AUTH=rkH-xq6G3jK7hFdk2MQjFT9qqJod_k9wY-riOni-9mM
+      - NEO4J_AUTH=your/authentication/key
 
   # Service 2: Redis (used by Django-Q)
   redis:

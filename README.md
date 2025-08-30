@@ -7,7 +7,7 @@ sdk: docker
 app_port: 8000
 pinned: false
 ---
-# Intelligent Document QA: An End-to-End RAG System with an AI Agent
+# Knowledge Extractor RAG: An End-to-End RAG System with an AI Agent
 
 This project implements a complete, full-stack, and production-ready system for performing Retrieval-Augmented Generation (RAG) on user-uploaded PDF documents. It features an asynchronous ingestion pipeline, a sophisticated hybrid retrieval strategy using a graph database, and a conversational AI agent capable of multi-tool use.
 
