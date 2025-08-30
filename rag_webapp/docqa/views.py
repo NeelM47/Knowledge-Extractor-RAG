@@ -1,5 +1,7 @@
 # docqa/views.py
 
+import os
+import json
 from django.shortcuts import render, redirect
 from django.core.files.storage import FileSystemStorage
 from django.http import JsonResponse
@@ -7,13 +9,45 @@ from neo4j import GraphDatabase
 from dotenv import load_dotenv
 from django.contrib import messages
 from django_q.tasks import async_task
-import os
+from django.views.decorators.csrf import csrf_exempt
+from agent.agent_executor import create_agent_with_memory
+from icecream import ic
+from langchain_core.messages import HumanMessage, AIMessage
 
 load_dotenv()
 
 from rag_pipeline.core import ask_question_to_rag, get_list_of_ingested_docs
 
 _driver = None
+
+agent_executor = create_agent_with_memory()
+
+@csrf_exempt
+def agent_view(request):
+    """A simple API view to interact with the LangChain agent."""
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        user_input = data.get('user_input', '').strip()
+
+        if user_input:
+            try:
+                result = agent_executor.invoke({
+                    "input": user_input
+                    })
+                return JsonResponse({
+                   "input": result["input"],
+                   "output": result["output"],
+                })
+
+            except Exception as e:
+                print(f"Other error: {e}")
+                return JsonResponse({"error": "Server error"}, status=500)
+
+        else:
+            return JsonResponse({"error": "Invalid request"}, status=400)
+                
+    else:
+        return JsonResponse({"error": "Invalid request"}, status=400)
 
 def get_neo4j_driver():
     """
@@ -52,9 +86,10 @@ def main_interface(request):
             'last_question': "",
             'last_doc': "",
             'ingested_docs':[], 
+            'show_rag_answer': False
         }
     try:
-        
+         
         driver = get_neo4j_driver()
 
         # Default context variables
@@ -90,6 +125,7 @@ def main_interface(request):
                     context['answer'] = answer
                     context['last_question'] = question
                     context['last_doc'] = document
+                    context['show_rag_answer'] = True
 
     except Exception as e:
         print(f"A fatal error occurred in the main view: {e}")

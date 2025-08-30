@@ -11,11 +11,12 @@
         .card { margin-top: 2rem; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
         .answer-box { background-color: #e9ecef; border-left: 5px solid #198754; padding: 1.5rem; margin-top: 1rem; border-radius: 5px; }
         .card-header { font-weight: bold; }
+        #chat-box .message { margin-bottom: 0.5rem; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1 class="mb-4 text-center">RAG Project with Document Ingestion & Citations</h1>
+        <h1 class="mb-4 text-center">Intelligent Document QA with an AI Agent</h1>
 
         <!-- PDF Upload Form -->
         <div class="card">
@@ -29,12 +30,19 @@
                     </div>
                     <button type="submit" name="upload_button" class="btn btn-primary">Upload and Ingest</button>
                 </form>
+                 {% if messages %}
+                    <div class="alert alert-success mt-3">
+                        {% for message in messages %}
+                            {{ message }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
             </div>
         </div>
 
-        <!-- Question Answering Form -->
+        <!-- Question Answering Form (Standard RAG) -->
         <div class="card">
-            <div class="card-header">Step 2: Ask a Question</div>
+            <div class="card-header">Step 2: Ask a Simple Question (Standard RAG)</div>
             <div class="card-body">
                 <form method="post">
                     {% csrf_token %}
@@ -56,8 +64,8 @@
             </div>
         </div>
 
-        <!-- Answer Display Section -->
-        {% if answer %}
+        <!-- Answer Display Section for Standard RAG -->
+        {% if show_rag_answer %}
         <div class="card">
             <div class="card-header">Answer</div>
             <div class="card-body">
@@ -69,6 +77,102 @@
             </div>
         </div>
         {% endif %}
+		
+        <!-- Agent Chat Card -->
+		<div class="card">
+		    <div class="card-header">Step 3: Chat with the AI Agent</div>
+		    <div class="card-body">
+		        <div id="chat-box" class="mb-3" style="height: 300px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; background-color: #f8f9fa; border-radius: 5px;">
+		            <div class="message"><strong>Agent:</strong> Hello! You can ask me to list available documents, query a document, or even compare two documents on a topic.</div>
+		        </div>
+		        <div class="input-group">
+		            <input type="text" id="agent-input" class="form-control" placeholder="Ask a complex question...">
+		            <button id="agent-submit" class="btn btn-info">Send</button>
+		        </div>
+		    </div>
+		</div>
     </div>
+	<script>
+    	document.addEventListener('DOMContentLoaded', function() {
+        // --- LOGIC FOR AGENT CHAT INTERFACE (IMPROVED VERSION) ---
+        const agentInput = document.getElementById('agent-input');
+        const agentSubmit = document.getElementById('agent-submit');
+        const chatBox = document.getElementById('chat-box');
+
+        async function handleAgentSubmit() {
+            const userInput = agentInput.value.trim();
+            if (!userInput) return;
+
+            // 1. Display user's message and clear the input
+            addMessage(userInput, 'user');
+            agentInput.value = '';
+
+            // 2. Add and keep a reference to a "Thinking..." message
+            const thinkingMessage = addMessage("Thinking...", 'agent');
+
+            try {
+                // 3. Send the request to the Django backend
+                const response = await fetch("{% url 'agent_view' %}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({ user_input: userInput })
+                });
+
+                // 4. Check if the server response is okay
+                if (!response.ok) {
+                    throw new Error(`Server responded with status: ${response.status}`);
+                }
+
+                // 5. Parse the JSON response from the server
+                const data = await response.json();
+
+                // --- CRITICAL DEBUGGING ---
+                console.log("Received data from agent:", data);
+                // --- END DEBUGGING ---
+
+                // 6. LangChain's final answer is in the 'output' key.
+                const agentResponse = data.output;
+                //const agentResponse = data.answer;
+
+                // 7. Check if we actually got a response
+                if (agentResponse) {
+                    // Replace the "Thinking..." text with the real answer.
+                    // Using innerHTML is fine here as we are constructing it.
+                    thinkingMessage.innerHTML = `<strong>Agent:</strong> ${agentResponse.replace(/\n/g, '<br>')}`;
+                } else {
+                    // If the 'output' key was missing or empty
+                    thinkingMessage.innerHTML = `<strong>Agent:</strong> I processed the request but didn't have a final answer.`;
+                }
+
+            } catch (error) {
+                // If the fetch itself fails or there's an error
+                console.error('Error with agent request:', error);
+                thinkingMessage.innerHTML = `<strong>Agent:</strong> Sorry, a communication error occurred. Please check the browser console.`;
+            }
+        }
+
+        agentSubmit.addEventListener('click', handleAgentSubmit);
+        agentInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                handleAgentSubmit();
+            }
+        });
+
+        function addMessage(text, sender) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message');
+            messageDiv.innerHTML = `<strong>${sender === 'user' ? 'You' : 'Agent'}:</strong> ${text}`;
+            chatBox.appendChild(messageDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            return messageDiv; // Return the created element
+        }
+
+        // --- Your existing polling script can remain here ---
+        // ...
+    	});
+	</script>
 </body>
 </html>

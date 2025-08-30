@@ -14,7 +14,7 @@ def ingestion_task(pdf_filepath):
     A single function that runs the entire ingestion pipeline for a given PDF.
     This will be executed in the background by Django-Q.
     """
-    #print(f"--- [Django-Q] Starting Ingestion Task for: {pdf_filepath} ---")
+    print(f"--- [Django-Q] Starting Ingestion Task for: {pdf_filepath} ---")
     
     # --- Neo4j Connection (The worker needs its own connection) ---
     NEO4J_URI = os.getenv("NEO4J_URI")
@@ -29,7 +29,13 @@ def ingestion_task(pdf_filepath):
     
     try:
         driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+
+        print(f"--- [Django-Q] verifying-connectivity ---")
+
         driver.verify_connectivity()
+
+        print(f"--- [Django-Q] Connectivity verified ---")
+
         process_and_ingest_pdf(driver, pdf_filepath)
         filename = os.path.basename(pdf_filepath)
         print(f"--- [Django-Q] Successfully Ingested: {filename} ---")

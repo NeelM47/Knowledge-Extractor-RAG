@@ -6,7 +6,10 @@ from google.generativeai.types import GenerationConfig
 from sentence_transformers import SentenceTransformer
 from sentence_transformers.cross_encoder import CrossEncoder
 from docling.document_converter import DocumentConverter
+from icecream import ic
 import os
+
+ic.configureOutput(prefix=f'Debug | ', includeContext=True)
 
 # --- This file is now the home for all lazy-loaded models ---
 LLM_MODEL = None
@@ -30,7 +33,8 @@ def get_llm_model():
         #print("Lazy loading Generative Model for the first time...")
         # Ensure your API key is set as an environment variable in your Space
         configure(api_key=os.getenv("GEMINI_API_KEY"))
-        LLM_MODEL = GenerativeModel("gemini-2.5-pro")
+        #LLM_MODEL = GenerativeModel("gemini-2.5-pro")
+        LLM_MODEL = GenerativeModel("gemini-2.5-flash-lite")
     return LLM_MODEL
 
 def get_docling_converter():
@@ -53,6 +57,11 @@ def extract_entities_from_text(text: str) -> list:
     """Uses the LLM to extract key entities from a text chunk."""
     model = get_llm_model() # Your lazy-loader for Gemini
 
+    generation_config = GenerationConfig(
+            max_output_tokens=4096,
+            temperature=0.0
+            )
+
     prompt = (
         "You are a helpful AI assistant for knowledge graph construction.\n"
         "From the following text, extract the key entities (people, organizations, locations, technical concepts, projects).\n"
@@ -61,11 +70,9 @@ def extract_entities_from_text(text: str) -> list:
         "--- ENTITIES (JSON List) ---\n"
     )
 
-    #ic(prompt)
-
     try:
-        response = model.generate_content(prompt)
-        #ic(response.text)
+        response = model.generate_content(prompt, generation_config=generation_config)
+        ic(response.text)
         # Clean up the response to get a valid JSON list
         json_text = response.text.strip().replace("```json", "").replace("```", "")
         entities = json.loads(json_text)

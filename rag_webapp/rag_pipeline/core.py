@@ -1,6 +1,7 @@
 from docling.document_converter import DocumentConverter
 from sentence_transformers import SentenceTransformer
 from google.generativeai import configure, GenerativeModel
+from google.generativeai.types import GenerationConfig
 from typing import List, Dict
 from sentence_transformers.cross_encoder import CrossEncoder
 from neo4j import GraphDatabase
@@ -47,8 +48,6 @@ def generate_answer_with_context(question: str, context_chunks: List[Dict]) -> s
 
     Answer:"""
 
-    #print(prompt)
-
     # Generate the response
     response = model.generate_content(prompt)
     
@@ -72,7 +71,6 @@ def query_llm(driver, question: str, filename: str, top_k: int = 4) -> str:
         The generated answer
     """
     # 1. Load the embedding model
-    #embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
     embedding_model = get_embedding_model()
 
     # 2. Retrieve relevant chunks
@@ -336,8 +334,6 @@ def extract_entities_from_text(text: str) -> list:
         "--- ENTITIES (JSON List) ---\n"
     )
 
-    #ic(prompt)
-
     try:
         response = model.generate_content(prompt)
         #ic(response.text)
@@ -394,3 +390,60 @@ def hybrid_retrieval(driver, model, question, filename, top_k=5):
             question_entities=question_entities
         )
         return [{"text": record["text"], "page": record["page"], "chunkno": record["chunkno"]} for record in results]
+
+def compare_documents_on_topic(driver, doc1_filename: str, doc2_filename: str, topic: str) -> str:
+    """
+    Retrieves context about a topic from two different documents and uses an LLM
+    to generate a comparative summary.
+
+    Args:
+        driver: The active Neo4j driver instance.
+        doc1_filename: The filename of the first document.
+        doc2_filename: The filename of the second document.
+        topic: The topic to find and compare in both documents.
+
+    Returns:
+        A string containing the comparative summary.
+    """
+    print(f"--- [Core Pipeline] Comparing '{doc1_filename}' and '{doc2_filename}' on topic: '{topic}' ---")
+
+    # --- Step 1: Gather Context from Both Documents ---
+    # We will reuse our powerful ask_question_to_rag function to get the
+    # most relevant, re-ranked context for the topic from each document.
+    # The "question" we ask is simply the topic itself.
+
+    print(f"Gathering context from '{doc1_filename}'...")
+    context1 = ask_question_to_rag(driver, question=topic, filename=doc1_filename)
+
+    print(f"Gathering context from '{doc2_filename}'...")
+    context2 = ask_question_to_rag(driver, question=topic, filename=doc2_filename)
+
+    # --- Step 2: Synthesize a Comparison with the LLM ---
+    # Now we build a new, specialized prompt for the comparison task.
+    llm = get_llm_model() # Get the lazy-loaded Gemini model
+
+    # It's good practice to check if the context was found before calling the LLM
+    if "No relevant information found" in context1 and "No relevant information found" in context2:
+        return f"I could not find any information about '{topic}' in either document."
+
+    comparison_prompt = (
+        "You are a helpful summarization and analysis assistant.\n"
+        "Your task is to compare and contrast the information provided from two different documents about a specific topic.\n"
+        "Analyze the context from each document and provide a concise summary of the similarities and differences.\n"
+        "If information is only present in one document, state that clearly.\n\n"
+        f"--- TOPIC OF COMPARISON ---\n{topic}\n\n"
+        f"--- CONTEXT FROM: {doc1_filename} ---\n{context1}\n\n"
+        f"--- CONTEXT FROM: {doc2_filename} ---\n{context2}\n\n"
+        "--- COMPARATIVE SUMMARY ---\n"
+    )
+
+    try:
+        # Use a generation config for better control
+        generation_config = GenerationConfig(
+            temperature=0.2 # Factual and concise
+        )
+        response = llm.generate_content(comparison_prompt, generation_config=generation_config)
+        return response.text
+    except Exception as e:
+        print(f"An error occurred during LLM comparison: {e}")
+        return "There was an error while generating the comparison."
