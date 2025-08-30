@@ -57,7 +57,7 @@ graph TD
     subgraph Agent Core
         B --> C{2. LangChain Agent Executor};
         C -- Thought --> D[3. LLM (Gemini)];
-        D -- Plan --> C;
+        D -- Plan --> C
         C -- Tool Call --> E[4. Custom Tools];
     end
 
