@@ -180,3 +180,13 @@ docker-compose down
 -   **Real-time Agent Feedback:** Implement WebSockets to stream the agent's "chain of thought" to the user interface in real-time.
 -   **User Authentication:** Add user accounts to allow for private document collections.
 -   **Enhanced Citations:** Use the bounding box data from Docling to visually highlight the source of an answer directly on a rendered PDF page.
+
+## License
+
+This project is licensed under the MIT License. See the `LICENSE` file for details.
+
+---
+
+## Contact
+
+[Neel Shirish More] – [https://www.linkedin.com/in/neel-more-267217219/] – [neelmore007@gmail.com]
