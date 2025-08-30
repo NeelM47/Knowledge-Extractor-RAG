@@ -55,10 +55,10 @@ graph TD
     end
 
     subgraph Agent Core
-        B --> C{2. LangChain Agent Executor}
-        C -- Thought --> D{3. LLM (Gemini)}
-        D -- Plan --> C
-        C -- Tool Call --> E[4. Custom Tools]
+        B --> C{2. LangChain Agent Executor};
+        C -- Thought --> D[3. LLM (Gemini)];
+        D -- Plan --> C;
+        C -- Tool Call --> E[4. Custom Tools];
     end
 
     subgraph RAG Backend
@@ -70,7 +70,7 @@ graph TD
         I --> J[8. LLM (Gemini)];
         J --> E;
     end
-    
+
     E --> C;
     C -- Final Answer --> B;
 ```
