@@ -100,7 +100,8 @@ This project is designed to be run locally using Docker Compose, which simplifie
 ### Step 1: Clone the Repository
 ```bash
 git clone https://github.com/YourUsername/Intelligent-Document-QA.git
-cd Intelligent-Document-QA```
+cd Intelligent-Document-QA
+```
 
 ### Step 2: Configure Your Environment Secrets
 The application requires API keys and database credentials.
