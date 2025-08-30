@@ -1,5 +1,7 @@
 django==4.2.0
 gunicorn
+langchain
+langchain-google-genai
 neo4j
 sentence-transformers
 google-generativeai
