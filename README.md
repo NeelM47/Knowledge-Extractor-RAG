@@ -34,23 +34,23 @@ graph TD;
 ```mermaid
 graph TD;
     subgraph User Interaction;
-        A[User sends message] --> B{1 Django Web App};
+        A[User sends message] --> B{1. Django Web App};
     end;
 
     subgraph Agent Core;
-        B --> C{2 LangChain Agent Executor};
-        C -- Thought --> D[3 LLM (Gemini)];
+        B --> C{2. LangChain Agent Executor};
+        C -- Thought --> D["3. LLM (Gemini)"];
         D -- Plan --> C;
-        C -- Tool Call --> E[4 Custom Tools];
+        C -- Tool Call --> E[4. Custom Tools];
     end;
 
     subgraph RAG Backend;
-        E -- (query_document) --> F{5 Hybrid Retrieval};
+        E -- (query_document) --> F{5. Hybrid Retrieval};
         F -- Graph & Vector Search --> G((Neo4j));
         G --> F;
-        F -- Re-ranking --> H[6 Cross-Encoder];
-        H --> I[7 Final Context];
-        I --> J[8 LLM (Gemini)];
+        F -- Re-ranking --> H[6. Cross-Encoder];
+        H --> I[7. Final Context];
+        I --> J[8. LLM (Gemini)];
         J --> E;
     end;
     
