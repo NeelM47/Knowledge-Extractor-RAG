@@ -82,7 +82,7 @@ This project is designed to be run locally with a single command using **Docker 
 
 ### Step 1: Clone the Repository
 ```bash
-git clone https://github.com/YourUsername/Knowledge-Extractor-RAG.git
+git clone https://github.com/NeelM47/Knowledge-Extractor-RAG.git
 cd Knowledge-Extractor-RAG
 ```
 
