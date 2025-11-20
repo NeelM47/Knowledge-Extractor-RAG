@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from django.contrib import messages
 from django_q.tasks import async_task
 from django.views.decorators.csrf import csrf_exempt
-from agent.agent_executor import create_agent_with_memory
+from agent.agent_handler import create_agent_with_memory
 from icecream import ic
 from langchain_core.messages import HumanMessage, AIMessage
 

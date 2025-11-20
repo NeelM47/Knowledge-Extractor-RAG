@@ -1,7 +1,12 @@
-django==4.2.0
+Django==4.2.7
+langchain==0.2.1
+langchain-google-genai==1.0.4
+langchain-community==0.2.1
+langchain-core==0.2.3
+langchainhub
+pymupdf==1.24.1
+faiss-cpu==1.8.0
 gunicorn
-langchain
-langchain-google-genai
 neo4j
 sentence-transformers
 google-generativeai
@@ -9,6 +14,3 @@ docling
 django-q
 python-dotenv
 icecream
---extra-index-url https://download.pytorch.org/whl/cpu
-torch
-torchvision
